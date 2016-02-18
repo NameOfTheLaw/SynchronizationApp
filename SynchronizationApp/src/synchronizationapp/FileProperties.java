@@ -30,6 +30,11 @@ public class FileProperties<P, T, D> implements Serializable {
         this.fType=fType;
     }
     
+    /**
+     * хэш-функция
+     * 
+     * @return уникальный код для конкретного набора fPath, fTime, fType
+     */
     @Override
     public int hashCode(){
         int hash = 37;
@@ -39,6 +44,12 @@ public class FileProperties<P, T, D> implements Serializable {
         return hash;
     }
     
+    /**
+     * метод для установления равенства объектов класса
+     * 
+     * @param obj объект, с которым необходимо проверить равенство
+     * @return результат установления равенства
+     */
     @Override
     public boolean equals(Object obj) {
         if (obj == null) {
@@ -58,10 +69,6 @@ public class FileProperties<P, T, D> implements Serializable {
             return false;
         }
        return true;
-    }
-    
-    public long compareTo(FileProperties<P, T, D> f) {    
-        return (Long)this.fTime - (Long)f.fTime;
     }
     
     /**
