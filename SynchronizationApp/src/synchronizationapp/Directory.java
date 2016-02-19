@@ -115,7 +115,6 @@ public class Directory<P> {
         for (File f : list) {
             boolean isDirectory = f.isDirectory();
             long lastModified = f.isDirectory() ? 0 : f.lastModified();
-            //long lastModified = f.lastModified();
             String fPath = f.getPath();
             if (isDirectory) {
                 scanDir(fPath, s);
@@ -129,9 +128,45 @@ public class Directory<P> {
      * создает скан настоящего состояния директории
      */
     public void createState() {
-        if (nowState==null) {
-            nowState = new HashSet<>();
-            scanDir((String)root,nowState);
+        nowState = new HashSet<>();
+        scanDir((String)root,nowState);
+    }
+    
+    /**
+     * Сравнивает две директории на основе их уникальных файлов и удаляет\создает нужные
+     * 
+     * @param dir1 первая директория
+     * @param dir2 вторая директория
+     * @param set1 множество уникальных файлов первой директории
+     * @param set2 множество уникальных файлов второй директории
+     */
+    private void checkAddOrDelete(Directory dir1, Directory dir2, Set<FileProperties> set1, Set<FileProperties> set2){        
+        Iterator iter1;
+        while (!set1.isEmpty() && dir2.getLastState()!=null) {
+            iter1=set1.iterator();
+            do {
+                boolean meet=false;
+                FileProperties setFile=(FileProperties)iter1.next();
+                for (FileProperties stateFile: (Set<FileProperties>)dir2.getLastState()) {
+                    if (setFile.getPath().equals(stateFile.getPath())) {
+                        meet=true;
+                        try {
+                            Files.delete(Paths.get((String)dir1.getPath()+File.separator+(String)setFile.getPath()));
+                            iter1.remove();
+                        } catch (IOException ex) {
+                            
+                        }
+                    }
+                }
+                if (!meet) {
+                    try {
+                        Files.copy(Paths.get((String)dir1.getPath()+File.separator+(String)setFile.getPath()), Paths.get((String)dir2.getPath()+File.separator+(String)setFile.getPath()));
+                        iter1.remove();
+                    } catch (IOException ex) {
+                        
+                    }
+                }
+            } while (iter1.hasNext());
         }
     }
     
@@ -143,47 +178,13 @@ public class Directory<P> {
     public void syncWith(Directory other) {
         Set<FileProperties> set1 = new HashSet<>();
         Set<FileProperties> set2 = new HashSet<>();
-        //ignoring lastState
+        
         set1.addAll(nowState);
         set2.addAll(other.getNowState());
         set1.removeAll(other.getNowState());
-        set2.removeAll(nowState);
+        set2.removeAll(nowState);        
         
-        while (!set1.isEmpty() || !set2.isEmpty()) {
-            Iterator iter1 = set1.iterator();
-            Iterator iter2 = set2.iterator();
-            boolean f;
-            while (iter1.hasNext()) {              
-                FileProperties file1 = (FileProperties)iter1.next();
-                FileProperties file2;
-                f=true;
-                while (f) {
-                    if (!iter2.hasNext()) {
-                        f=false;
-                    } else {
-                        file2 = (FileProperties)iter2.next();
-                        if (file1.getPath().equals(file2.getPath())) {
-                            if ((long)file1.getModifiedTime()>(long)file2.getModifiedTime()) {
-                                try {
-                                    Files.copy(Paths.get(root+File.separator+(String)file1.getPath()), Paths.get((String)other.getPath()+File.separator+(String)file2.getPath()), StandardCopyOption.REPLACE_EXISTING);
-                                } catch (IOException ex) {
-                                    
-                                }
-                            } else {
-                                try {
-                                    Files.copy(Paths.get((String)other.getPath()+File.separator+(String)file2.getPath()), Paths.get(root+File.separator+(String)file1.getPath()), StandardCopyOption.REPLACE_EXISTING);
-                                } catch (IOException ex) {
-                                    
-                                }
-                            }
-                            iter1.remove();
-                            iter2.remove();
-                        }
-                    }
-                }
-            }
-        }
-        
+        /*
         System.out.println("-----");
         for (FileProperties fi: set1) {
             System.out.println(fi.getPath()+" "+fi.getModifiedTime()+" "+fi.isDirectory());
@@ -193,5 +194,56 @@ public class Directory<P> {
             System.out.println(fi.getPath()+" "+fi.getModifiedTime()+" "+fi.isDirectory());
         }
         System.out.println("-----");
+        */
+        
+        boolean f=true;
+        Iterator iter1;
+        Iterator iter2;
+        
+        while (f) {
+            f=false;
+            iter1 = set1.iterator();
+            while (iter1.hasNext()) {            
+                FileProperties file1=(FileProperties)iter1.next(), file2=null;
+                iter2 = set2.iterator();
+                while (iter2.hasNext()) {
+                    file2=(FileProperties)iter2.next();
+                    if (file1.getPath().equals(file2.getPath()) && !(boolean)file1.isDirectory() && !(boolean)file2.isDirectory()) {
+                        if ((long)file1.getModifiedTime()>(long)file2.getModifiedTime()) {
+                            try {
+                                Files.copy(Paths.get(root+File.separator+(String)file1.getPath()), Paths.get((String)other.getPath()+File.separator+(String)file2.getPath()), StandardCopyOption.REPLACE_EXISTING);
+                            } catch (IOException ex) {
+
+                            }
+                            f=true;
+                        } else {
+                            try {
+                                Files.copy(Paths.get((String)other.getPath()+File.separator+(String)file2.getPath()), Paths.get(root+File.separator+(String)file1.getPath()), StandardCopyOption.REPLACE_EXISTING);
+                            } catch (IOException ex) {
+
+                            }
+                            f=true;
+                        }
+                        iter1.remove();
+                        iter2.remove();
+                    }
+                }
+            }
+        }
+        
+        checkAddOrDelete(this,other,set1,set2);
+        checkAddOrDelete(other,this,set2,set1);
+        
+        /*
+        System.out.println("-----");
+        for (FileProperties fi: set1) {
+            System.out.println(fi.getPath()+" "+fi.getModifiedTime()+" "+fi.isDirectory());
+        }
+        System.out.println("-----");
+        for (FileProperties fi: set2) {
+            System.out.println(fi.getPath()+" "+fi.getModifiedTime()+" "+fi.isDirectory());
+        }
+        System.out.println("-----");
+        */
     }
 }
