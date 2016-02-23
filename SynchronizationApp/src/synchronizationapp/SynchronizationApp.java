@@ -12,21 +12,19 @@ import java.io.File;
  * @author andrey
  */
 public class SynchronizationApp {
+    public static final String CONFIG_PATH = "E:\\ITMO\\2_kurs\\programs\\SynchronizationApp\\SynchronizationApp\\config\\config.xml";
+    public static Config config;
+    public static String root1,root2,lastState1,lastState2;
 
     /**
      * метод используется для синхронизации двух директорий
-     * 
-     * @param root1 путь к первой директории
-     * @param laststate1 путь к последнему снимку первой директории
-     * @param root2 путь ко второй директории
-     * @param laststate2 путь к последнему снимку второй директории
      */
-    public static void SyncDirectories(String root1, String laststate1, String root2, String laststate2){
+    public static void syncDirectories(){
         
         Directory dir1 = new Directory(root1);        
         Directory dir2 = new Directory(root2);
         
-        if (dir1.loadLastState(new File(laststate1)) && dir2.loadLastState(new File(laststate2))) {           
+        if (dir1.loadLastState(new File(lastState1)) && dir2.loadLastState(new File(lastState2))) {           
             dir1.createState();
             dir2.createState();
             
@@ -35,8 +33,8 @@ public class SynchronizationApp {
             dir1.createState();
             dir2.createState();
             
-            dir1.saveStateToFile(new File(laststate1));
-            dir2.saveStateToFile(new File(laststate2));
+            dir1.saveStateToFile(new File(lastState1));
+            dir2.saveStateToFile(new File(lastState2));
         } else {            
             dir1.createState();
             dir2.createState();
@@ -46,17 +44,30 @@ public class SynchronizationApp {
             dir1.createState();
             dir2.createState();
             
-            dir1.saveStateToFile(new File(laststate1));
-            dir2.saveStateToFile(new File(laststate2));
+            dir1.saveStateToFile(new File(lastState1));
+            dir2.saveStateToFile(new File(lastState2));
         }
     }
     
     /**
+     * метод для подгрузки параметров из конфига
+     */
+    public static void loadConfig() {
+        config = new Config(CONFIG_PATH);
+        config.loadFromXML();
+        root1 = config.getProperty("root1");
+        root2 = config.getProperty("root2");
+        lastState1 = config.getProperty("lastState1");
+        lastState2 = config.getProperty("lastState2");
+    }
+    
+    /**
+     * основной метод приложения
      * @param args the command line arguments
      */
     public static void main(String[] args){
-        // TODO code application logic here
-        SyncDirectories(args[0], args[1], args[2], args[3]);
+        loadConfig();
+        syncDirectories();
     }
     
 }
