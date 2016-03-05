@@ -29,12 +29,15 @@ class Config {
     
     /**
      * Метод загрузки конфигурации из XML-файла
+     * 
+     * @return результат выполнения считывания xml-файла (удача\не удача)
      */
-    public void loadFromXML() {
+    public boolean loadFromXML() {
         try (FileInputStream fs = new FileInputStream(file);) {
             prop.loadFromXML(fs);
+            return true;
         } catch (IOException ex) {
-            
+            return false;
         }
     }
 
@@ -54,7 +57,7 @@ class Config {
      * @param key ключ
      * @param value значение
      */
-    public void SetProperty(String key, String value) {
+    public void setProperty(String key, String value) {
         prop.setProperty(key,value);
     }
     
@@ -65,5 +68,15 @@ class Config {
      */
     public String getProperty(String key) {
         return prop.getProperty(key);
-    }    
+    }
+    
+    public void standartConfig() {
+        prop.clear();
+        prop.setProperty("root1", "E:\\ITMO\\2_kurs\\battlefield\\direc1");
+        prop.setProperty("root2", "E:\\ITMO\\2_kurs\\battlefield\\direc2");
+        prop.setProperty("lastState1", "E:\\ITMO\\2_kurs\\battlefield\\laststate1");
+        prop.setProperty("lastState2", "E:\\ITMO\\2_kurs\\battlefield\\laststate2");
+        saveToXML();
+    }
+    
 }

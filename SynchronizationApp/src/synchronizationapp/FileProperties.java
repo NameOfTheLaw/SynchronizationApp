@@ -12,10 +12,11 @@ import java.io.Serializable;
  * 
  * @author andrey
  */
-public class FileProperties<P, T, D> implements Serializable {
+public class FileProperties<P, T, D> implements Serializable, Comparable {
     private P fPath;
     private T fTime;
     private D fType;
+    private boolean fullEquals;
     
     /**
      * конструктор класса
@@ -28,6 +29,7 @@ public class FileProperties<P, T, D> implements Serializable {
         this.fPath=fPath;
         this.fTime=fTime;
         this.fType=fType;
+        fullEquals = false;
     }
     
     /**
@@ -39,8 +41,10 @@ public class FileProperties<P, T, D> implements Serializable {
     public int hashCode(){
         int hash = 37;
         hash = hash*17 + (fPath == null ? 0 : fPath.hashCode());
-        hash = hash*17 + (fType == null ? 0 : fType.hashCode());
-        hash = hash*17 + (fTime == null ? 0 : fTime.hashCode());
+        if (fullEquals) {
+            hash = hash*17 + (fType == null ? 0 : fType.hashCode());
+            hash = hash*17 + (fTime == null ? 0 : fTime.hashCode());
+        }
         return hash;
     }
     
@@ -60,15 +64,23 @@ public class FileProperties<P, T, D> implements Serializable {
         }
         FileProperties<P, T, D> other = (FileProperties<P, T, D>) obj;
         if (!this.fPath.equals(other.fPath)) {
+            //System.out.println("Не равны"+this.fPath+" "+other.fPath);
             return false;
+        } else {
+            //System.out.println("Равны"+this.fPath+" "+other.fPath);            
         }
-        if (!this.fType.equals(other.fType)) {
-            return false;
+        if (fullEquals) {
+            //System.out.println("0");
+            if (!this.fType.equals(other.fType)) {
+                return false;
+            }
+            if (!this.fTime.equals(other.fTime)) {
+                return false;
+            }
+        } else {            
+            //System.out.println("1");
         }
-        if (!this.fTime.equals(other.fTime)) {
-            return false;
-        }
-       return true;
+        return true;
     }
     
     /**
@@ -96,5 +108,37 @@ public class FileProperties<P, T, D> implements Serializable {
      */
     public D isDirectory() {
         return fType;
+    }
+    
+    /**
+     * устанавливает полный уровень сравнения
+     */
+    public void setFullEquals() {
+        fullEquals = true;
+    }
+    
+    /**
+     * устанавливает частичный уровень сравнения
+     */
+    public void setPathEquals() {
+        fullEquals = false;
+    }
+    
+    /**
+     * возвращает уровень сравнения
+     * @return полный уровень сравнения (да\нет)
+     */
+    public boolean getFullEquals() {
+        return fullEquals;
+    }
+
+    /**
+     * переопределение метода сравнения объектов класса (используется в TreeSet)
+     * @param t объект для сравнения
+     * @return результат сравнения
+     */
+    @Override
+    public int compareTo(Object t) {
+        return ((String)this.getPath()).compareTo((String)((FileProperties)t).getPath());
     }
 }

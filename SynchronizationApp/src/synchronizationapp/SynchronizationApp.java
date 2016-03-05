@@ -14,17 +14,16 @@ import java.io.File;
 public class SynchronizationApp {
     public static final String CONFIG_PATH = "E:\\ITMO\\2_kurs\\programs\\SynchronizationApp\\SynchronizationApp\\config\\config.xml";
     public static Config config;
-    public static String root1,root2,lastState1,lastState2;
 
     /**
      * метод используется для синхронизации двух директорий
      */
     public static void syncDirectories(){
         
-        Directory dir1 = new Directory(root1);        
-        Directory dir2 = new Directory(root2);
+        Directory dir1 = new Directory(config.getProperty("root1"));       
+        Directory dir2 = new Directory(config.getProperty("root2"));
         
-        if (dir1.loadLastState(new File(lastState1)) && dir2.loadLastState(new File(lastState2))) {           
+        if (dir1.loadLastState(new File(config.getProperty("lastState1"))) && dir2.loadLastState(new File(config.getProperty("lastState2")))) {           
             dir1.createState();
             dir2.createState();
             
@@ -33,32 +32,51 @@ public class SynchronizationApp {
             dir1.createState();
             dir2.createState();
             
-            dir1.saveStateToFile(new File(lastState1));
-            dir2.saveStateToFile(new File(lastState2));
+            dir1.saveStateToFile(new File(config.getProperty("lastState1")));
+            dir2.saveStateToFile(new File(config.getProperty("lastState2")));
         } else {            
-            dir1.createState();
-            dir2.createState();
+            dir1.createState(); dir1.setLastState();
+            dir2.createState(); dir2.setLastState();
             
             dir1.syncWith(dir2);
             
             dir1.createState();
             dir2.createState();
             
-            dir1.saveStateToFile(new File(lastState1));
-            dir2.saveStateToFile(new File(lastState2));
+            dir1.saveStateToFile(new File(config.getProperty("lastState1")));
+            dir2.saveStateToFile(new File(config.getProperty("lastState2")));
         }
     }
     
     /**
-     * метод для подгрузки параметров из конфига
+     * метод для подгрузки параметров в config
      */
     public static void loadConfig() {
         config = new Config(CONFIG_PATH);
-        config.loadFromXML();
-        root1 = config.getProperty("root1");
-        root2 = config.getProperty("root2");
-        lastState1 = config.getProperty("lastState1");
-        lastState2 = config.getProperty("lastState2");
+        if (!config.loadFromXML()) {
+            config.standartConfig();
+        }
+    }
+    
+    /**
+     * метод инициализации конфига
+     * @param args консольные аргументы
+     * @return результат инициализации (успех\провал)
+     */
+    public static boolean initConfig(String[] args) {        
+        if (args.length == 0) {
+            loadConfig();
+        } else {
+            if (args.length % 2 == 0) {
+                for (int i = 0; i < args.length; i=i+2) {
+                    config.setProperty(args[i], args[i+1]);
+                    System.out.println("\'"+args[i]+"\' - \'"+args[i+1]+"\' saved");
+                }
+            } else {
+                return false;
+            }
+        }
+        return true;
     }
     
     /**
@@ -66,8 +84,12 @@ public class SynchronizationApp {
      * @param args the command line arguments
      */
     public static void main(String[] args){
-        loadConfig();
-        syncDirectories();
+        if (initConfig(args)) {            
+            syncDirectories();
+        } else {
+            System.out.println("Incorrect input. try again");
+            System.out.println("java -jar SynchronizationApp.jar [, key value ] ");
+        }
     }
     
 }

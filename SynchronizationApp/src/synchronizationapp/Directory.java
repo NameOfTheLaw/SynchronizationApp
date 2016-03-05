@@ -14,9 +14,9 @@ import java.io.ObjectOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * содержит информацию о директории и методы работы с ней
@@ -26,7 +26,7 @@ import java.util.Set;
 public class Directory<P> {
     
     private P root;
-    private HashSet<FileProperties> lastState=null,nowState=null;
+    private TreeSet<FileProperties> lastState=null,nowState=null;
     
     /**
      * конструктор класса
@@ -73,7 +73,7 @@ public class Directory<P> {
     public boolean loadLastState(File file){
         try (FileInputStream fs = new FileInputStream(file);ObjectInputStream os = new ObjectInputStream(fs);) {
             if (!file.exists()) return false;
-            lastState = (HashSet<FileProperties>)os.readObject();
+            lastState = (TreeSet<FileProperties>)os.readObject();
             return true;
         } catch (IOException ex) {
             return false;
@@ -82,8 +82,21 @@ public class Directory<P> {
         }
     }
     
+    /** Устанавливает последнее состояние системы равным настоящему
+     *
+     * @return результат операции (удачный\неудачный)
+     */
+    public boolean setLastState() {
+        if (nowState != null) {
+            lastState = (TreeSet)nowState.clone();
+            return true;
+        } else {
+            return false;
+        }
+    }
+    
     /**
-     * Сохранить текущее состояние в файл
+     * Сохраняет текущее состояние в файл
      * 
      * @param file файл для сохранения состояния
      * @return статус результата операции
@@ -125,125 +138,137 @@ public class Directory<P> {
     }
     
     /**
-     * создает скан настоящего состояния директории
+     * Создает скан настоящего состояния директории
      */
     public void createState() {
-        nowState = new HashSet<>();
+        nowState = new TreeSet<>();
         scanDir((String)root,nowState);
     }
     
+    public boolean copyFile(P path1, P path2) {
+        try {
+            Files.copy(Paths.get((String)path1), Paths.get((String)path2));
+            return true;
+        } catch (IOException ex) {
+            return false;
+        }
+    }
+    
+    public boolean deleteFile(P path) {        
+        try {
+            Files.delete(Paths.get((String)path));
+            return true;
+        } catch (IOException ex) {
+            return false;
+        }
+    }
+    
     /**
-     * Сравнивает две директории на основе их уникальных файлов и удаляет\создает нужные
+     * Сравнивает две директории на основе их уникальных файлов и удаляет\создает нужные     
      * 
      * @param dir1 первая директория
      * @param dir2 вторая директория
      * @param set1 множество уникальных файлов первой директории
-     * @param set2 множество уникальных файлов второй директории
      */
-    private void checkAddOrDelete(Directory dir1, Directory dir2, Set<FileProperties> set1, Set<FileProperties> set2){        
+    private void checkAddOrDelete(Directory dir1, Directory dir2, TreeSet<FileProperties> set1){
+        dir2.setFullEquals();
+        FileProperties fi1;
         Iterator iter1;
-        while (!set1.isEmpty() && dir2.getLastState()!=null) {
-            iter1=set1.iterator();
-            do {
-                boolean meet=false;
-                FileProperties setFile=(FileProperties)iter1.next();
-                for (FileProperties stateFile: (Set<FileProperties>)dir2.getLastState()) {
-                    if (setFile.getPath().equals(stateFile.getPath())) {
-                        meet=true;
-                        try {
-                            Files.delete(Paths.get((String)dir1.getPath()+File.separator+(String)setFile.getPath()));
-                            iter1.remove();
-                        } catch (IOException ex) {
-                            
-                        }
-                    }
-                }
-                if (!meet) {
-                    try {
-                        Files.copy(Paths.get((String)dir1.getPath()+File.separator+(String)setFile.getPath()), Paths.get((String)dir2.getPath()+File.separator+(String)setFile.getPath()));
-                        iter1.remove();
-                    } catch (IOException ex) {
-                        
-                    }
-                }
-            } while (iter1.hasNext());
+        iter1 = set1.iterator();
+        while (iter1.hasNext()) {
+            fi1 = (FileProperties)iter1.next();
+            if (dir2.getLastState().contains(fi1)) {
+                if (dir1.deleteFile((String)dir1.getPath()+File.separator+(String)fi1.getPath())) iter1.remove();
+            } else {
+                if (dir1.copyFile(dir1.getPath()+File.separator+fi1.getPath(), dir2.getPath()+File.separator+fi1.getPath())) iter1.remove();
+            }
+        }
+        iter1 = set1.descendingIterator();
+        while (iter1.hasNext()) {
+            fi1 = (FileProperties)iter1.next();
+            if (dir2.getLastState().contains(fi1)) {
+                if (dir1.deleteFile((String)dir1.getPath()+File.separator+(String)fi1.getPath())) iter1.remove();
+            } else {
+                if (dir1.copyFile(dir1.getPath()+File.separator+fi1.getPath(), dir2.getPath()+File.separator+fi1.getPath())) iter1.remove();
+            }
         }
     }
     
     /**
-     * синхронизирует файлы директорий
+     * Синхронизирует файлы директорий     
      * 
      * @param other директория для синхронизии
      */
     public void syncWith(Directory other) {
-        Set<FileProperties> set1 = new HashSet<>();
-        Set<FileProperties> set2 = new HashSet<>();
+        TreeSet<FileProperties> set1 = new TreeSet<>();
+        TreeSet<FileProperties> set2 = new TreeSet<>();
+        TreeSet<FileProperties> set3 = new TreeSet<>();
+        TreeSet<FileProperties> set4 = new TreeSet<>();
         
         set1.addAll(nowState);
-        set2.addAll(other.getNowState());
         set1.removeAll(other.getNowState());
-        set2.removeAll(nowState);        
         
-        /*
-        System.out.println("-----");
-        for (FileProperties fi: set1) {
-            System.out.println(fi.getPath()+" "+fi.getModifiedTime()+" "+fi.isDirectory());
-        }
-        System.out.println("-----");
-        for (FileProperties fi: set2) {
-            System.out.println(fi.getPath()+" "+fi.getModifiedTime()+" "+fi.isDirectory());
-        }
-        System.out.println("-----");
-        */
+        set2.addAll(other.getNowState());
+        set2.removeAll(nowState);
         
-        boolean f=true;
-        Iterator iter1;
-        Iterator iter2;
+        set3.addAll(nowState);
+        set4.addAll(other.getNowState());
         
-        while (f) {
-            f=false;
-            iter1 = set1.iterator();
-            while (iter1.hasNext()) {            
-                FileProperties file1=(FileProperties)iter1.next(), file2=null;
-                iter2 = set2.iterator();
-                while (iter2.hasNext()) {
-                    file2=(FileProperties)iter2.next();
-                    if (file1.getPath().equals(file2.getPath()) && !(boolean)file1.isDirectory() && !(boolean)file2.isDirectory()) {
+        set3.retainAll(set4);
+        set4.retainAll(set3);
+        
+        Iterator iter1 = set3.iterator();
+        Iterator iter2 = set4.iterator();
+        
+        FileProperties file1;
+        FileProperties file2;
+        
+        while (iter1.hasNext()) {
+            if (iter2.hasNext()) {
+                file1 = (FileProperties)iter1.next();
+                file2 = (FileProperties)iter2.next();
+                file1.setFullEquals();
+                file2.setFullEquals();
+                if (file1.equals(file2)) {
+                    iter1.remove();
+                    iter2.remove();
+                } else {
+                    file1.setPathEquals();
+                    file2.setPathEquals();
+                    if (file1.equals(file2)) {
                         if ((long)file1.getModifiedTime()>(long)file2.getModifiedTime()) {
                             try {
                                 Files.copy(Paths.get(root+File.separator+(String)file1.getPath()), Paths.get((String)other.getPath()+File.separator+(String)file2.getPath()), StandardCopyOption.REPLACE_EXISTING);
                             } catch (IOException ex) {
 
                             }
-                            f=true;
                         } else {
                             try {
                                 Files.copy(Paths.get((String)other.getPath()+File.separator+(String)file2.getPath()), Paths.get(root+File.separator+(String)file1.getPath()), StandardCopyOption.REPLACE_EXISTING);
                             } catch (IOException ex) {
 
                             }
-                            f=true;
                         }
                         iter1.remove();
                         iter2.remove();
-                    }
+                    }                    
                 }
             }
         }
         
-        checkAddOrDelete(this,other,set1,set2);
-        checkAddOrDelete(other,this,set2,set1);
-        
-        /*
-        System.out.println("-----");
-        for (FileProperties fi: set1) {
-            System.out.println(fi.getPath()+" "+fi.getModifiedTime()+" "+fi.isDirectory());
+        checkAddOrDelete(this,other,set1);
+        checkAddOrDelete(other,this,set2);
+    }
+
+    /**
+     * устанавливает элементам всех снимков уровень сравнения fullEquals
+     */
+    public void setFullEquals() {
+        for (FileProperties fi: nowState) {
+            fi.setFullEquals();
         }
-        System.out.println("-----");
-        for (FileProperties fi: set2) {
-            System.out.println(fi.getPath()+" "+fi.getModifiedTime()+" "+fi.isDirectory());
+        for (FileProperties fi: lastState) {
+            fi.setFullEquals();
         }
-        System.out.println("-----");
-        */
     }
 }
