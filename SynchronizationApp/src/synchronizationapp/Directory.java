@@ -164,7 +164,7 @@ public class Directory<P> {
     }
     
     /**
-     * Сравнивает две директории на основе их уникальных файлов и удаляет\создает нужные     
+     * Сравнивает две директории на основе их уникальных файлов и удаляет\создает необходимые на основе последних состояний системы
      * 
      * @param dir1 первая директория
      * @param dir2 вторая директория
@@ -194,6 +194,45 @@ public class Directory<P> {
         }
     }
     
+    public void checkBothChanged(Directory dir1, Directory dir2, TreeSet<FileProperties> set1, TreeSet<FileProperties> set2) {
+        Iterator iter1 = set1.iterator();
+        Iterator iter2 = set2.iterator();
+        
+        FileProperties file1;
+        FileProperties file2;
+        while (iter1.hasNext()) {
+            if (iter2.hasNext()) {
+                file1 = (FileProperties)iter1.next();
+                file2 = (FileProperties)iter2.next();
+                file1.setFullEquals();
+                file2.setFullEquals();
+                if (file1.equals(file2)) {
+                    iter1.remove();
+                    iter2.remove();
+                } else {
+                    file1.setPathEquals();
+                    file2.setPathEquals();
+                    if (file1.equals(file2)) {
+                        if ((long)file1.getModifiedTime()>(long)file2.getModifiedTime()) {
+                            try {
+                                Files.copy(Paths.get((String)dir1.getPath()+File.separator+(String)file1.getPath()), Paths.get((String)dir2.getPath()+File.separator+(String)file2.getPath()), StandardCopyOption.REPLACE_EXISTING);
+                            } catch (IOException ex) {
+
+                            }
+                        } else {
+                            try {
+                                Files.copy(Paths.get((String)dir2.getPath()+File.separator+(String)file2.getPath()), Paths.get((String)dir1.getPath()+File.separator+(String)file1.getPath()), StandardCopyOption.REPLACE_EXISTING);
+                            } catch (IOException ex) {
+
+                            }
+                        }
+                        iter1.remove();
+                        iter2.remove();
+                    }                    
+                }
+            }
+        }
+    }
     /**
      * Синхронизирует файлы директорий     
      * 
@@ -216,46 +255,8 @@ public class Directory<P> {
         
         set3.retainAll(set4);
         set4.retainAll(set3);
-        
-        Iterator iter1 = set3.iterator();
-        Iterator iter2 = set4.iterator();
-        
-        FileProperties file1;
-        FileProperties file2;
-        
-        while (iter1.hasNext()) {
-            if (iter2.hasNext()) {
-                file1 = (FileProperties)iter1.next();
-                file2 = (FileProperties)iter2.next();
-                file1.setFullEquals();
-                file2.setFullEquals();
-                if (file1.equals(file2)) {
-                    iter1.remove();
-                    iter2.remove();
-                } else {
-                    file1.setPathEquals();
-                    file2.setPathEquals();
-                    if (file1.equals(file2)) {
-                        if ((long)file1.getModifiedTime()>(long)file2.getModifiedTime()) {
-                            try {
-                                Files.copy(Paths.get(root+File.separator+(String)file1.getPath()), Paths.get((String)other.getPath()+File.separator+(String)file2.getPath()), StandardCopyOption.REPLACE_EXISTING);
-                            } catch (IOException ex) {
-
-                            }
-                        } else {
-                            try {
-                                Files.copy(Paths.get((String)other.getPath()+File.separator+(String)file2.getPath()), Paths.get(root+File.separator+(String)file1.getPath()), StandardCopyOption.REPLACE_EXISTING);
-                            } catch (IOException ex) {
-
-                            }
-                        }
-                        iter1.remove();
-                        iter2.remove();
-                    }                    
-                }
-            }
-        }
-        
+                
+        checkBothChanged(this,other,set3,set4);
         checkAddOrDelete(this,other,set1);
         checkAddOrDelete(other,this,set2);
     }
