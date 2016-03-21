@@ -18,43 +18,9 @@ public class SynchronizationApp {
     /**
      * метод используется для синхронизации двух директорий
      */
-    public static void syncDirectories(){    
-        
-        //реализация с потоком ~ 40-80
-        
+    public static void syncDirectories(){
         SyncThread syncThread = new SyncThread(config);
-        syncThread.start();
-        
-        
-        //реализация без потока ~ 70-110
-        /*
-        Directory dir1 = new Directory(config.getProperty("root1"));       
-        Directory dir2 = new Directory(config.getProperty("root2"));
-
-        if (dir1.loadLastState(new File(config.getProperty("lastState1"))) && dir2.loadLastState(new File(config.getProperty("lastState2")))) {           
-            dir1.createState();
-            dir2.createState();
-
-            dir1.syncWith(dir2);           
-
-            dir1.createState();
-            dir2.createState();
-
-            dir1.saveStateToFile(new File(config.getProperty("lastState1")));
-            dir2.saveStateToFile(new File(config.getProperty("lastState2")));
-        } else {            
-            dir1.createState(); dir1.setLastState();
-            dir2.createState(); dir2.setLastState();
-
-            dir1.syncWith(dir2);
-
-            dir1.createState();
-            dir2.createState();
-
-            dir1.saveStateToFile(new File(config.getProperty("lastState1")));
-            dir2.saveStateToFile(new File(config.getProperty("lastState2")));
-        }
-        */
+        syncThread.start();        
     }
     
     /**
@@ -62,8 +28,12 @@ public class SynchronizationApp {
      */
     public static void loadConfig() {
         config = new Config(CONFIG_PATH);
+        System.out.println("Loading config.xml...");
         if (!config.loadFromXML()) {
+            System.out.println("Config was not found");
+            System.out.println("Creating standart config...");
             config.standartConfig();
+            config.saveToXML();
         }
     }
     
@@ -72,15 +42,20 @@ public class SynchronizationApp {
      * @param args консольные аргументы
      * @return результат инициализации (успех\провал)
      */
-    public static boolean initConfig(String[] args) {        
-        if (args.length == 0) {
-            loadConfig();
+    public static boolean initConfig(String[] args) {
+        loadConfig();
+        if (args.length >= 1) {               
+            config.setStatus(args[0]);
         } else {
-            if (args.length % 2 == 0) {
-                for (int i = 0; i < args.length; i=i+2) {
+            return false;
+        }        
+        if (args.length > 1) {         
+            if ((args.length + 1) % 2 == 0) {
+                for (int i = 1; i < args.length; i=i+2) {
                     config.setProperty(args[i], args[i+1]);
                     System.out.println("\'"+args[i]+"\' - \'"+args[i+1]+"\' saved");
                 }
+                config.saveToXML();
             } else {
                 return false;
             }
@@ -97,11 +72,11 @@ public class SynchronizationApp {
         if (initConfig(args)) {            
             syncDirectories();
         } else {
-            System.out.println("Incorrect input. try again");
+            System.out.println("Incorrect input. Please try again");
             System.out.println("java -jar SynchronizationApp.jar [, key value ] ");
         }
         time = System.currentTimeMillis() - time;
-        System.out.println(time);
+        //System.out.println("Synchronization has been completed in "+time+"ms");
     }
     
 }

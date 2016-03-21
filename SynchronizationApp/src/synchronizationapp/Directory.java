@@ -11,9 +11,11 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.TreeSet;
@@ -23,7 +25,7 @@ import java.util.TreeSet;
  * 
  * @author andrey
  */
-public class Directory<P> {
+public class Directory<P> implements Serializable{
     
     private P root;
     private TreeSet<FileProperties> lastState=null,nowState=null;
@@ -164,13 +166,16 @@ public class Directory<P> {
     }
     
     /**
-     * Сравнивает две директории на основе их уникальных файлов и удаляет\создает необходимые на основе последних состояний системы
+     * Сравнивает две директории на основе их уникальных файлов и создает коллекции 
+     * необходимых файлов для удаления\замены на основе последних состояний системы
      * 
-     * @param dir1 первая директория
-     * @param dir2 вторая директория
-     * @param set1 множество уникальных файлов первой директории
+     * @param dir1
+     * @param dir2
+     * @param set1
+     * @param toReplace
+     * @param toRemove 
      */
-    private void checkAddOrDelete(Directory dir1, Directory dir2, TreeSet<FileProperties> set1){
+    private void checkAddOrDelete(Directory dir1, Directory dir2, TreeSet<FileProperties> set1, Set<FileProperties> toReplace, Set<FileProperties> toRemove){
         dir2.setFullEquals();
         FileProperties fi1;
         Iterator iter1;
@@ -178,23 +183,24 @@ public class Directory<P> {
         while (iter1.hasNext()) {
             fi1 = (FileProperties)iter1.next();
             if (dir2.getLastState().contains(fi1)) {
-                if (dir1.deleteFile((String)dir1.getPath()+File.separator+(String)fi1.getPath())) iter1.remove();
+                toRemove.add(fi1);
             } else {
-                if (dir1.copyFile(dir1.getPath()+File.separator+fi1.getPath(), dir2.getPath()+File.separator+fi1.getPath())) iter1.remove();
-            }
-        }
-        iter1 = set1.descendingIterator();
-        while (iter1.hasNext()) {
-            fi1 = (FileProperties)iter1.next();
-            if (dir2.getLastState().contains(fi1)) {
-                if (dir1.deleteFile((String)dir1.getPath()+File.separator+(String)fi1.getPath())) iter1.remove();
-            } else {
-                if (dir1.copyFile(dir1.getPath()+File.separator+fi1.getPath(), dir2.getPath()+File.separator+fi1.getPath())) iter1.remove();
+                toReplace.add(fi1);                
             }
         }
     }
     
-    public void checkBothChanged(Directory dir1, Directory dir2, TreeSet<FileProperties> set1, TreeSet<FileProperties> set2) {
+    /**
+     * 
+     * 
+     * @param dir1
+     * @param dir2
+     * @param set1
+     * @param set2
+     * @param toClientReplace
+     * @param toServerReplace 
+     */
+    public void checkBothChanged(Directory dir1, Directory dir2, TreeSet<FileProperties> set1, TreeSet<FileProperties> set2, Set<FileProperties> toClientReplace, Set<FileProperties> toServerReplace) {
         Iterator iter1 = set1.iterator();
         Iterator iter2 = set2.iterator();
         
@@ -214,17 +220,9 @@ public class Directory<P> {
                     file2.setPathEquals();
                     if (file1.equals(file2)) {
                         if ((long)file1.getModifiedTime()>(long)file2.getModifiedTime()) {
-                            try {
-                                Files.copy(Paths.get((String)dir1.getPath()+File.separator+(String)file1.getPath()), Paths.get((String)dir2.getPath()+File.separator+(String)file2.getPath()), StandardCopyOption.REPLACE_EXISTING);
-                            } catch (IOException ex) {
-
-                            }
+                            toClientReplace.add(file1);
                         } else {
-                            try {
-                                Files.copy(Paths.get((String)dir2.getPath()+File.separator+(String)file2.getPath()), Paths.get((String)dir1.getPath()+File.separator+(String)file1.getPath()), StandardCopyOption.REPLACE_EXISTING);
-                            } catch (IOException ex) {
-
-                            }
+                            toServerReplace.add(file2);                            
                         }
                         iter1.remove();
                         iter2.remove();
@@ -233,12 +231,17 @@ public class Directory<P> {
             }
         }
     }
+    
     /**
-     * Синхронизирует файлы директорий     
+     * Создает необходимые для дальнейшей синхронизации коллекции элементов    
      * 
      * @param other директория для синхронизии
+     * @param toClientReplace
+     * @param toClientRemove
+     * @param toServerReplace
+     * @param toServerRemove
      */
-    public void syncWith(Directory other) {
+    public void syncWith(Directory other, HashSet<FileProperties> toClientReplace, HashSet<FileProperties> toClientRemove, HashSet<FileProperties> toServerReplace, HashSet<FileProperties> toServerRemove) {
         TreeSet<FileProperties> set1 = new TreeSet<>();
         TreeSet<FileProperties> set2 = new TreeSet<>();
         TreeSet<FileProperties> set3 = new TreeSet<>();
@@ -256,11 +259,17 @@ public class Directory<P> {
         set3.retainAll(set4);
         set4.retainAll(set3);
                 
-        checkBothChanged(this,other,set3,set4);
-        checkAddOrDelete(this,other,set1);
-        checkAddOrDelete(other,this,set2);
+        checkBothChanged(this,other,set3,set4,toClientReplace,toServerReplace);
+        checkAddOrDelete(this,other,set1,toClientReplace,toServerRemove);
+        checkAddOrDelete(other,this,set2,toServerReplace,toClientRemove);
     }
 
+    public void deleteAll(Set<FileProperties> set) {
+        for (FileProperties fi : set) {
+            deleteFile((P)((String)this.getPath()+File.separator+(String)fi.getPath()));
+        }
+    }
+    
     /**
      * устанавливает элементам всех снимков уровень сравнения fullEquals
      */

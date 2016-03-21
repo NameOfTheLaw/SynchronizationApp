@@ -17,6 +17,7 @@ import java.util.Properties;
 class Config {
     private final String file;
     private Properties prop;
+    private String status;
 
     /**
      * Конструктор класса
@@ -61,6 +62,10 @@ class Config {
         prop.setProperty(key,value);
     }
     
+    public void setStatus(String status) {
+        this.status = status;
+    }
+    
     /**
      * Метод для просмотра значения параметра конфигурации
      * @param key
@@ -68,6 +73,10 @@ class Config {
      */
     public String getProperty(String key) {
         return prop.getProperty(key);
+    }    
+    
+    public String getStatus() {
+        return status;
     }
     
     public void standartConfig() {
@@ -76,6 +85,8 @@ class Config {
         prop.setProperty("root2", "E:\\ITMO\\2_kurs\\battlefield\\direc2");
         prop.setProperty("lastState1", "E:\\ITMO\\2_kurs\\battlefield\\laststate1");
         prop.setProperty("lastState2", "E:\\ITMO\\2_kurs\\battlefield\\laststate2");
+        prop.setProperty("host", "127.0.0.1");
+        prop.setProperty("port", "6666");
         saveToXML();
     }
     
