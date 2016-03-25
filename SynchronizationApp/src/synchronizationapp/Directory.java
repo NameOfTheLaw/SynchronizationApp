@@ -175,7 +175,7 @@ public class Directory<P> implements Serializable{
      * @param toReplace
      * @param toRemove 
      */
-    private void checkAddOrDelete(Directory dir1, Directory dir2, TreeSet<FileProperties> set1, Set<FileProperties> toReplace, Set<FileProperties> toRemove){
+    private void checkAddOrDelete(Directory dir1, Directory dir2, TreeSet<FileProperties> set1, TreeSet<FileProperties> toReplace, TreeSet<FileProperties> toRemove){
         dir2.setFullEquals();
         FileProperties fi1;
         Iterator iter1;
@@ -200,7 +200,7 @@ public class Directory<P> implements Serializable{
      * @param toClientReplace
      * @param toServerReplace 
      */
-    public void checkBothChanged(Directory dir1, Directory dir2, TreeSet<FileProperties> set1, TreeSet<FileProperties> set2, Set<FileProperties> toClientReplace, Set<FileProperties> toServerReplace) {
+    public void checkBothChanged(Directory dir1, Directory dir2, TreeSet<FileProperties> set1, TreeSet<FileProperties> set2, TreeSet<FileProperties> toServerReplace, TreeSet<FileProperties> toClientReplace) {
         Iterator iter1 = set1.iterator();
         Iterator iter2 = set2.iterator();
         
@@ -221,8 +221,10 @@ public class Directory<P> implements Serializable{
                     if (file1.equals(file2)) {
                         if ((long)file1.getModifiedTime()>(long)file2.getModifiedTime()) {
                             toClientReplace.add(file1);
+                            //toServerReplace.add(file1);
                         } else {
-                            toServerReplace.add(file2);                            
+                            toServerReplace.add(file2);   
+                            //toClientReplace.add(file2);                         
                         }
                         iter1.remove();
                         iter2.remove();
@@ -241,7 +243,7 @@ public class Directory<P> implements Serializable{
      * @param toServerReplace
      * @param toServerRemove
      */
-    public void syncWith(Directory other, HashSet<FileProperties> toClientReplace, HashSet<FileProperties> toClientRemove, HashSet<FileProperties> toServerReplace, HashSet<FileProperties> toServerRemove) {
+    public void syncWith(Directory other, TreeSet<FileProperties> toClientReplace, TreeSet<FileProperties> toClientRemove, TreeSet<FileProperties> toServerReplace, TreeSet<FileProperties> toServerRemove) {
         TreeSet<FileProperties> set1 = new TreeSet<>();
         TreeSet<FileProperties> set2 = new TreeSet<>();
         TreeSet<FileProperties> set3 = new TreeSet<>();
@@ -259,13 +261,20 @@ public class Directory<P> implements Serializable{
         set3.retainAll(set4);
         set4.retainAll(set3);
                 
-        checkBothChanged(this,other,set3,set4,toClientReplace,toServerReplace);
+        checkBothChanged(this,other,set3,set4,toServerReplace,toClientReplace);
+        
         checkAddOrDelete(this,other,set1,toClientReplace,toServerRemove);
         checkAddOrDelete(other,this,set2,toServerReplace,toClientRemove);
+        
+        /*
+        checkAddOrDelete(this,other,set1,toServerReplace,toServerRemove);
+        checkAddOrDelete(other,this,set2,toClientReplace,toClientRemove);
+        */
     }
 
-    public void deleteAll(Set<FileProperties> set) {
-        for (FileProperties fi : set) {
+    public void deleteAll(TreeSet<FileProperties> set) {
+        for (FileProperties fi : set.descendingSet()) {
+            System.out.println("deleting "+(String)fi.getPath()+"...");
             deleteFile((P)((String)this.getPath()+File.separator+(String)fi.getPath()));
         }
     }
