@@ -5,8 +5,6 @@
  */
 package synchronizationapp;
 
-import java.io.File;
-
 /**
  *
  * @author andrey
@@ -53,7 +51,7 @@ public class SynchronizationApp {
             if ((args.length + 1) % 2 == 0) {
                 for (int i = 1; i < args.length; i=i+2) {
                     config.setProperty(args[i], args[i+1]);
-                    System.out.println("\'"+args[i]+"\' - \'"+args[i+1]+"\' saved");
+                    System.out.println("\'"+args[i]+"\' - \'"+args[i+1]+"\' saved in config!");
                 }
                 config.saveToXML();
             } else {
@@ -68,15 +66,12 @@ public class SynchronizationApp {
      * @param args the command line arguments
      */
     public static void main(String[] args){
-        long time = System.currentTimeMillis();
         if (initConfig(args)) {            
             syncDirectories();
         } else {
             System.out.println("Incorrect input. Please try again");
-            System.out.println("java -jar SynchronizationApp.jar [, key value ] ");
+            System.out.println("java -jar SynchronizationApp.jar client/server [, key value ] ");
         }
-        time = System.currentTimeMillis() - time;
-        //System.out.println("Synchronization has been completed in "+time+"ms");
     }
     
 }

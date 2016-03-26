@@ -1,3 +1,4 @@
 # SynchronizationApp
 
-To launch and test the application start the "start.bat"
+Run the "server.bat" firstly. Then run "client.bat" to automatically start synchronization
+

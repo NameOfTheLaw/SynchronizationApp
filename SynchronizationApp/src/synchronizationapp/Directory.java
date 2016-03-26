@@ -14,8 +14,6 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.TreeSet;
@@ -73,7 +71,9 @@ public class Directory<P> implements Serializable{
      * @return статус результата операции
      */
     public boolean loadLastState(File file){
-        try (FileInputStream fs = new FileInputStream(file);ObjectInputStream os = new ObjectInputStream(fs);) {
+        try (   FileInputStream fs = new FileInputStream(file);
+                ObjectInputStream os = new ObjectInputStream(fs);
+                ) {
             if (!file.exists()) return false;
             lastState = (TreeSet<FileProperties>)os.readObject();
             return true;
@@ -147,6 +147,12 @@ public class Directory<P> implements Serializable{
         scanDir((String)root,nowState);
     }
     
+    /**
+     * Копирует файл из path1 в path2
+     * @param path1 путь к файлу
+     * @param path2 путь к его новой копии
+     * @return успех\неудача
+     */
     public boolean copyFile(P path1, P path2) {
         try {
             Files.copy(Paths.get((String)path1), Paths.get((String)path2));
@@ -156,6 +162,11 @@ public class Directory<P> implements Serializable{
         }
     }
     
+    /**
+     * Удаляет файл в директории
+     * @param path путь для удаления файла
+     * @return успех\неудача
+     */
     public boolean deleteFile(P path) {        
         try {
             Files.delete(Paths.get((String)path));
@@ -166,14 +177,13 @@ public class Directory<P> implements Serializable{
     }
     
     /**
-     * Сравнивает две директории на основе их уникальных файлов и создает коллекции 
-     * необходимых файлов для удаления\замены на основе последних состояний системы
-     * 
-     * @param dir1
-     * @param dir2
-     * @param set1
-     * @param toReplace
-     * @param toRemove 
+     * Сравнивает две директории на основе их уникальных файлов. Добавляет в коллекции toReplace и toRemove
+     * параметры необходимых файлов для удаления\замены на основе последних состояний системы.     * 
+     * @param dir1 первая директория
+     * @param dir2 второя директория
+     * @param set1 параметры уникальных файлов первой директории
+     * @param toReplace параметры файлов для копирования во вторую директорию
+     * @param toRemove параметры файлов для удаления в первой директории
      */
     private void checkAddOrDelete(Directory dir1, Directory dir2, TreeSet<FileProperties> set1, TreeSet<FileProperties> toReplace, TreeSet<FileProperties> toRemove){
         dir2.setFullEquals();
@@ -191,16 +201,16 @@ public class Directory<P> implements Serializable{
     }
     
     /**
-     * 
-     * 
-     * @param dir1
-     * @param dir2
-     * @param set1
-     * @param set2
-     * @param toClientReplace
-     * @param toServerReplace 
+     * Сравнивает файлы, которые были изменены в обеих директориях. 
+     * Добавляет в коллекции toDir1Replace и toDir2Replace параметры файлов, необходимых для копирования.     * 
+     * @param dir1 первая директория
+     * @param dir2 вторая директория
+     * @param set1 измененные файлы первой директории, которые также изменены во второй
+     * @param set2 измененные файлы второй директории, которые также изменены в первой
+     * @param toDir1Replace параметры файлов для копирования в первую директорию
+     * @param toDir2Replace параметры файлов для копирования во вторую директорию
      */
-    public void checkBothChanged(Directory dir1, Directory dir2, TreeSet<FileProperties> set1, TreeSet<FileProperties> set2, TreeSet<FileProperties> toServerReplace, TreeSet<FileProperties> toClientReplace) {
+    public void checkBothChanged(Directory dir1, Directory dir2, TreeSet<FileProperties> set1, TreeSet<FileProperties> set2, TreeSet<FileProperties> toDir1Replace, TreeSet<FileProperties> toDir2Replace) {
         Iterator iter1 = set1.iterator();
         Iterator iter2 = set2.iterator();
         
@@ -220,11 +230,9 @@ public class Directory<P> implements Serializable{
                     file2.setPathEquals();
                     if (file1.equals(file2)) {
                         if ((long)file1.getModifiedTime()>(long)file2.getModifiedTime()) {
-                            toClientReplace.add(file1);
-                            //toServerReplace.add(file1);
+                            toDir2Replace.add(file1);
                         } else {
-                            toServerReplace.add(file2);   
-                            //toClientReplace.add(file2);                         
+                            toDir1Replace.add(file2);               
                         }
                         iter1.remove();
                         iter2.remove();
@@ -235,15 +243,15 @@ public class Directory<P> implements Serializable{
     }
     
     /**
-     * Создает необходимые для дальнейшей синхронизации коллекции элементов    
-     * 
+     * Создает необходимые для дальнейшей синхронизации коллекции элементов toClientReplace, toClientRemove, 
+     * toServerReplace, toServerRemove путем сравнения this и other директорий
      * @param other директория для синхронизии
-     * @param toClientReplace
-     * @param toClientRemove
-     * @param toServerReplace
-     * @param toServerRemove
+     * @param toOtherReplace параметры файлов для копирования во вторую директорию
+     * @param toOtherRemove параметры файлов для удаления во второй директории
+     * @param toThisReplace параметры файлов для копирования в основную директорию
+     * @param toThisRemove параметры файлов для удаления в основной директории
      */
-    public void syncWith(Directory other, TreeSet<FileProperties> toClientReplace, TreeSet<FileProperties> toClientRemove, TreeSet<FileProperties> toServerReplace, TreeSet<FileProperties> toServerRemove) {
+    public void syncWith(Directory other, TreeSet<FileProperties> toOtherReplace, TreeSet<FileProperties> toOtherRemove, TreeSet<FileProperties> toThisReplace, TreeSet<FileProperties> toThisRemove) {
         TreeSet<FileProperties> set1 = new TreeSet<>();
         TreeSet<FileProperties> set2 = new TreeSet<>();
         TreeSet<FileProperties> set3 = new TreeSet<>();
@@ -261,17 +269,16 @@ public class Directory<P> implements Serializable{
         set3.retainAll(set4);
         set4.retainAll(set3);
                 
-        checkBothChanged(this,other,set3,set4,toServerReplace,toClientReplace);
+        checkBothChanged(this,other,set3,set4,toThisReplace,toOtherReplace);
         
-        checkAddOrDelete(this,other,set1,toClientReplace,toServerRemove);
-        checkAddOrDelete(other,this,set2,toServerReplace,toClientRemove);
-        
-        /*
-        checkAddOrDelete(this,other,set1,toServerReplace,toServerRemove);
-        checkAddOrDelete(other,this,set2,toClientReplace,toClientRemove);
-        */
+        checkAddOrDelete(this,other,set1,toOtherReplace,toThisRemove);
+        checkAddOrDelete(other,this,set2,toThisReplace,toOtherRemove);
     }
 
+    /**
+     * Удаляет из директории все файлы, содержащиеся в set
+     * @param set параметры файлов для удаления
+     */
     public void deleteAll(TreeSet<FileProperties> set) {
         for (FileProperties fi : set.descendingSet()) {
             System.out.println("deleting "+(String)fi.getPath()+"...");
