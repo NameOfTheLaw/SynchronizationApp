@@ -13,11 +13,16 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.TreeSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.persistence.EntityManager;
+import javax.persistence.EntityManagerFactory;
+import javax.persistence.Persistence;
 
 /**
  * Класс-поток сервера. При запуске начинает записывать поступающие команды до "stop".
@@ -65,11 +70,12 @@ public class Server extends WebMember {
             ArrayList<String> commands = new ArrayList<String>();
             int changes;
             long time = 0;
-            boolean timeisstart = false;
+            boolean timeisstart = false,
+                clientIsAuthorised = false;
             
-            System.out.println("Waiting for client...");            
-            initCommandTransferring();            
-            //serverDir.createState();
+            System.out.println("Waiting for client...");
+                        
+            initCommandTransferring();
             try {
                 while (!(input = textInput.readLine()).equals("stop")) {
                     time = (timeisstart) ? time : System.currentTimeMillis();
@@ -85,81 +91,125 @@ public class Server extends WebMember {
             while (!commands.isEmpty()) {
                 System.out.println("> handling now: "+commands.get(mark)+"/"+commands.size());
                 switch ((String)commands.get(mark)) {
-                    case "sendDirectory" : {
+                    case "authorization" : {
+                        ApplicationUser user = new ApplicationUser();
                         try {
-                            clientDir = (Directory) objectInput.readObject();
+                            user.setLogin(textInput.readLine());
+                            user.setPassword(textInput.readLine());
                         } catch (IOException ex) {
                             Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
-                        } catch (ClassNotFoundException ex) {
-                            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
-                        }                       
-                        serverDir.syncWith(clientDir, toClientReplace, toClientRemove, toServerReplace, toServerRemove);
-                        changes = toClientReplace.size() + toClientRemove.size() + toServerReplace.size() + toServerRemove.size();
-                        System.out.println("I have found " + changes + " changes");
-                        serverDir.deleteAll(toServerRemove);
-                        System.out.println("----toClientReplace----");
-                        for (FileProperties fi1: toClientReplace) {
-                            System.out.println(fi1.getPath());
                         }
-                        System.out.println("----toClientRemove----");
-                        for (FileProperties fi1: toClientRemove) {
-                            System.out.println(fi1.getPath());
+                        EntityManagerFactory emf = Persistence.createEntityManagerFactory("SynchronizationAppPU");            
+                        EntityManager em = emf.createEntityManager();
+                        em.getTransaction().begin();
+                        List<ApplicationUser> users = (List<ApplicationUser>)em.createQuery("from ApplicationUser").getResultList();
+                        em.getTransaction().commit();
+                        em.close();
+                        emf.close();
+                        if (users.contains(user)) {
+                            System.out.println("Authorization successfull!");
+                            clientIsAuthorised = true;
+                            textOutput.println("continue");
+                        } else {                            
+                            System.out.println("Bad authorization...");
+                            clientIsAuthorised = false;
+                            textOutput.println("stop");
+                            commands.clear();
+                            break;
                         }
-                        System.out.println("----toServerReplace----");
-                        for (FileProperties fi1: toServerReplace) {
-                            System.out.println(fi1.getPath());
+                        break;
+                    }
+                    case "sendDirectory" : {
+                        if (clientIsAuthorised) {
+                            try {
+                                clientDir = (Directory) objectInput.readObject();
+                            } catch (IOException ex) {
+                                Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+                            } catch (ClassNotFoundException ex) {
+                                Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+                            }                       
+                            serverDir.syncWith(clientDir, toClientReplace, toClientRemove, toServerReplace, toServerRemove);
+                            changes = toClientReplace.size() + toClientRemove.size() + toServerReplace.size() + toServerRemove.size();
+                            System.out.println("I have found " + changes + " changes");
+                            serverDir.deleteAll(toServerRemove);
+                            System.out.println("----toClientReplace----");
+                            for (FileProperties fi1: toClientReplace) {
+                                System.out.println(fi1.getPath());
+                            }
+                            System.out.println("----toClientRemove----");
+                            for (FileProperties fi1: toClientRemove) {
+                                System.out.println(fi1.getPath());
+                            }
+                            System.out.println("----toServerReplace----");
+                            for (FileProperties fi1: toServerReplace) {
+                                System.out.println(fi1.getPath());
+                            }
+                            System.out.println("----toServerRemove----");
+                            for (FileProperties fi1: toServerRemove) {
+                                System.out.println(fi1.getPath());
+                            }
+                            System.out.println("--------");
                         }
-                        System.out.println("----toServerRemove----");
-                        for (FileProperties fi1: toServerRemove) {
-                            System.out.println(fi1.getPath());
-                        }
-                        System.out.println("--------");
                         break;
                     }
                     case "getServerReplace" : {
-                        try {
-                            objectOutput.writeObject(toServerReplace);
-                        } catch (IOException ex) {
-                            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+                        if (clientIsAuthorised) {
+                            try {
+                                objectOutput.writeObject(toServerReplace);
+                            } catch (IOException ex) {
+                                Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+                            }
                         }
                         break;
                     }
                     case "getClientReplace" : {                        
-                        try {
-                            objectOutput.writeObject(toClientReplace);
-                        } catch (IOException ex) {
-                            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+                        if (clientIsAuthorised) {
+                            try {
+                                objectOutput.writeObject(toClientReplace);
+                            } catch (IOException ex) {
+                                Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+                            }
                         }
                         break;
                     }
-                    case "getClientRemove" : {                        
-                        try {
-                            objectOutput.writeObject(toClientRemove);
-                        } catch (IOException ex) {
-                            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+                    case "getClientRemove" : {    
+                        if (clientIsAuthorised) {                    
+                            try {
+                                objectOutput.writeObject(toClientRemove);
+                            } catch (IOException ex) {
+                                Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+                            }
                         }
                         break;
                     }
-                    case "startFilesTransfer" : {
-                        deinitObjectTransferring();
-                        initFileTransferring();
+                    case "startFilesTransfer" : {                        
+                        if (clientIsAuthorised) {
+                            deinitObjectTransferring();
+                            initFileTransferring();
+                        }
                         break;
                     }
                     case "startObjectsTransfer" : {
-                        deinitCommandTransferring();
-                        initObjectTransferring();
+                        if (clientIsAuthorised) {
+                            deinitCommandTransferring();
+                            initObjectTransferring();
+                        }
                         break;
                     }
                     case "sendForServerReplace" : {
-                        receiveFiles(dataInput,serverDir,toServerReplace);
+                        if (clientIsAuthorised) {
+                            receiveFiles(dataInput,serverDir,toServerReplace);
+                        }
                         break;
                     }
                     case "waitForClientReplace" : {
-                        sendFiles(dataOutput,serverDir,toClientReplace);
+                        if (clientIsAuthorised) {
+                            sendFiles(dataOutput,serverDir,toClientReplace);
+                        }
                         break;
                     }
                 }
-                commands.remove(mark);
+                if (!commands.isEmpty()) commands.remove(mark);
             }
             deinitFileTransferring();
             serverDir.createState();
@@ -175,8 +225,9 @@ public class Server extends WebMember {
             server = new ServerSocket(Integer.valueOf(config.getProperty("port")));
             commandSocket = server.accept();
             out = commandSocket.getOutputStream();
-            in = commandSocket.getInputStream();        
-            textInput = new BufferedReader(new InputStreamReader(in));
+            in = commandSocket.getInputStream();            
+            textOutput = new PrintWriter(out,true);      
+            textInput = new BufferedReader(new InputStreamReader(in)); 
         } catch (IOException ex) {
             Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -189,9 +240,12 @@ public class Server extends WebMember {
             commandSocket.close();
             out.close();
             in.close();
+            textOutput.close();
             textInput.close();
         } catch (IOException ex) {
             Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (NullPointerException ex) {
+            //ignore
         }
     }
 
@@ -220,6 +274,8 @@ public class Server extends WebMember {
             objectInput.close();
         } catch (IOException ex) {
             Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (NullPointerException ex) {
+            //ignore
         }
     }
 
@@ -234,6 +290,8 @@ public class Server extends WebMember {
             dataInput = new DataInputStream(in);
         } catch (IOException ex) {
             Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (NullPointerException ex) {
+            //ignore
         }
     }
 
@@ -248,6 +306,8 @@ public class Server extends WebMember {
             dataInput.close();
         } catch (IOException ex) {
             Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (NullPointerException ex) {
+            //ignore
         }
     }    
 }

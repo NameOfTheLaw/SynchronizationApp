@@ -29,7 +29,6 @@ import java.util.logging.Logger;
  * @author andrey
  */
 abstract class WebMember extends Thread{
-    // implements IWebMember
     
     protected Config config;
     protected final String CLIENT_ROOT="root2";
@@ -147,6 +146,26 @@ abstract class WebMember extends Thread{
         for (FileProperties fp : set) {
             receiveFile(dataInput,dir,fp);
         }
+    }    
+    
+    /**
+     * Перевод строки в MD5 хеш
+     * @param s строка
+     * @return MD5 хеш
+     */
+    private static String MD5(String s) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("MD5");
+            byte[] array = md.digest(s.getBytes());
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < array.length; ++i) {
+                sb.append(Integer.toHexString((array[i] & 0xFF) | 0x100).substring(1, 3));
+            }
+            return sb.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            // ignore
+        }
+        return null;
     }
     
     /**

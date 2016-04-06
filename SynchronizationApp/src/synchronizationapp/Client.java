@@ -5,11 +5,13 @@
  */
 package synchronizationapp;
 
+import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
@@ -55,51 +57,92 @@ public class Client extends WebMember{
         TreeSet<FileProperties> toServerReplace = new TreeSet<FileProperties>(),
                         toClientRemove = new TreeSet<FileProperties>(),
                         toClientReplace = new TreeSet<FileProperties>();
+        boolean connectionIsEstablished = false,
+                authorizationPassed = false;
         
-        initCommandTransferring();        
-        textOutput.println("startObjectsTransfer");
-        textOutput.println("sendDirectory");
-        textOutput.println("getServerReplace");
-        textOutput.println("getClientReplace");
-        textOutput.println("getClientRemove");
-        textOutput.println("startFilesTransfer");
-        textOutput.println("sendForServerReplace");
-        textOutput.println("waitForClientReplace");
-        textOutput.println("stop");
-        deinitCommandTransferring();
-
-        System.out.println("Start processing...");
-        initObjectTransferring();
         try {
-            objectOutput.writeObject(clientDir);      
-            toServerReplace = (TreeSet<FileProperties>) objectInput.readObject();   
-            toClientReplace = (TreeSet<FileProperties>) objectInput.readObject();
-            toClientRemove = (TreeSet<FileProperties>) objectInput.readObject();
-        } catch (IOException ex) {
-            Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (ClassNotFoundException ex) {
-            Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+            initCommandTransferring();
+        } catch (Exception ex) {
+            System.out.println("Can't connect to server...");
+        } finally {
+            System.out.println("Connection had established...");
+            connectionIsEstablished = true;
         }
-        deinitObjectTransferring();
-        clientDir.deleteAll(toClientRemove);
+        
+        if (connectionIsEstablished) {
+            textOutput.println("authorization");
+            textOutput.println("startObjectsTransfer");
+            textOutput.println("sendDirectory");
+            textOutput.println("getServerReplace");
+            textOutput.println("getClientReplace");
+            textOutput.println("getClientRemove");
+            textOutput.println("startFilesTransfer");
+            textOutput.println("sendForServerReplace");
+            textOutput.println("waitForClientReplace");
+            textOutput.println("stop");
+            
+            textOutput.println(config.getProperty("login"));
+            textOutput.println(config.getProperty("password"));
+            String answer = null;
+            
+            try {
+                answer = textInput.readLine();
+            } catch (IOException ex) {
+                Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                authorizationPassed = false;
+                System.out.println("Authorization error");
+            }
+            
+            if (answer.equals("continue")) {
+                authorizationPassed = true;
+                System.out.println("Authorization successfull!");
+            } else {
+                authorizationPassed = false;
+                System.out.println("Bad authorization...");
+            }
+            deinitCommandTransferring();
 
-        System.out.println("Start transferring files...");        
-        initFileTransferring();        
-        sendFiles(dataOutput,clientDir,toServerReplace);
-        receiveFiles(dataInput,clientDir,toClientReplace);        
-        deinitFileTransferring();
+            if (authorizationPassed) {            
+                System.out.println("Start processing...");
+                initObjectTransferring();
+                try {
+                    objectOutput.writeObject(clientDir);      
+                    toServerReplace = (TreeSet<FileProperties>) objectInput.readObject();   
+                    toClientReplace = (TreeSet<FileProperties>) objectInput.readObject();
+                    toClientRemove = (TreeSet<FileProperties>) objectInput.readObject();
+                } catch (IOException ex) {
+                    Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (ClassNotFoundException ex) {
+                    Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                }
+                deinitObjectTransferring();
+                clientDir.deleteAll(toClientRemove);
 
-        clientDir.createState();
-        clientDir.saveStateToFile(new File(config.getProperty(CLIENT_STATE)));
-        System.out.println("Completed!");        
+                System.out.println("Start transferring files...");        
+                initFileTransferring();        
+                sendFiles(dataOutput,clientDir,toServerReplace);
+                receiveFiles(dataInput,clientDir,toClientReplace);        
+                deinitFileTransferring();
+
+                clientDir.createState();
+                clientDir.saveStateToFile(new File(config.getProperty(CLIENT_STATE)));
+                System.out.println("Completed!");            
+            } else {
+                System.out.println("Please check your login and password. Bye");               
+            }
+        } else {
+            System.out.println("Please try again later. Bye");
+        }
     }
     
     @Override
     protected void initCommandTransferring() {        
         try {
             commandSocket = new Socket(config.getProperty("host"),Integer.valueOf(config.getProperty("port")));
-            out = commandSocket.getOutputStream();            
-            textOutput = new PrintWriter(out,true);
+            out = commandSocket.getOutputStream();
+            in = commandSocket.getInputStream();         
+            textOutput = new PrintWriter(out,true);       
+            textInput = new BufferedReader(new InputStreamReader(in));     
         } catch (IOException ex) {
             Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -110,9 +153,13 @@ public class Client extends WebMember{
         try {
             commandSocket.close();
             out.close();     
+            in.close();
             textOutput.close();
+            textInput.close();
         } catch (IOException ex) {
             Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (NullPointerException ex) {
+            //ignore
         }
     }
     
@@ -139,6 +186,8 @@ public class Client extends WebMember{
             objectInput.close();
         } catch (IOException ex) {
             Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (NullPointerException ex) {
+            //ignore
         }
     }
     
@@ -165,6 +214,8 @@ public class Client extends WebMember{
             dataInput.close();
         } catch (IOException ex) {
             Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (NullPointerException ex) {
+            //ignore
         }
     }
     

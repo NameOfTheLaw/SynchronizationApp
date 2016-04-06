@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<persistence version="2.1" xmlns="http://xmlns.jcp.org/xml/ns/persistence" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/persistence http://xmlns.jcp.org/xml/ns/persistence/persistence_2_1.xsd">
+  <persistence-unit name="SynchronizationAppPU" transaction-type="RESOURCE_LOCAL">
+    <provider>org.hibernate.ejb.HibernatePersistence</provider>
+    <class>synchronizationapp.ApplicationUser</class>
+    <properties>
+      <property name="hibernate.dialect" value="org.hibernate.dialect.Oracle9Dialect"/>
+      <property name="javax.persistence.jdbc.url" value="jdbc:oracle:thin:@students.dce.ifmo.ru:1521/xe"/>
+      <property name="javax.persistence.jdbc.user" value="s191978"/>
+      <property name="javax.persistence.jdbc.driver" value="oracle.jdbc.OracleDriver"/>
+      <property name="javax.persistence.jdbc.password" value="igmaj4"/>
+    </properties>
+  </persistence-unit>
+</persistence>
