@@ -15,6 +15,11 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
+import java.rmi.Naming;
+import java.rmi.NotBoundException;
+import java.rmi.RemoteException;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.TreeSet;
@@ -44,243 +49,74 @@ public class Server extends WebMember {
         if (!serverDir.loadLastState(new File(config.getProperty(SERVER_STATE)))) {
             serverDir.setLastState();
         }                    
-        commandSocket = null;
         dataSocket = null;
-        objectSocket = null;
         dataOutput = null;
-        dataInput = null;            
-        objectOutput = null;
-        objectInput = null;
+        dataInput = null;      
         server = null;            
         out = null;
-        in = null;        
-        textInput = null;
+        in = null;      
     }    
     
     @Override
     public void run() {
-
-        while (true) {            
+        String serviceName = "mySyncService";
+        Registry reg = null;
+        try {
+            reg = LocateRegistry.createRegistry(1099);
+        } catch (RemoteException ex) {
+            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        
+        while (true) {
             TreeSet<FileProperties> 
-                    toClientReplace = new TreeSet<FileProperties>(),
-                    toClientRemove = new TreeSet<FileProperties>(), 
-                    toServerReplace = new TreeSet<FileProperties>(),
-                    toServerRemove = new TreeSet<FileProperties>();            
-            String input;
-            ArrayList<String> commands = new ArrayList<String>();
-            int changes;
-            long time = 0;
+                    toClientReplace = null,
+                    toClientRemove = null, 
+                    toServerReplace = null,
+                    toServerRemove = null;
             boolean timeisstart = false,
-                clientIsAuthorised = false;
-            
+                clientIsAuthorised = false;            
+            ISyncService serverService = null;
+
             System.out.println("Waiting for client...");
-                        
-            initCommandTransferring();
-            try {
-                while (!(input = textInput.readLine()).equals("stop")) {
-                    time = (timeisstart) ? time : System.currentTimeMillis();
-                    commands.add(input);
-                }
-            } catch (IOException ex) {
+
+            try {                   
+                serverService = new SyncService();
+                serverService.setServer(this);
+                serverService.setServerDir(serverDir);
+                reg.rebind(serviceName, serverService);
+            } catch (RemoteException ex) {
                 Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
-            }                        
-            serverDir.createState();
-            
-            System.out.println("Start processing...");
-            int mark = 0;
-            while (!commands.isEmpty()) {
-                System.out.println("> handling now: "+commands.get(mark)+"/"+commands.size());
-                switch ((String)commands.get(mark)) {
-                    case "authorization" : {
-                        ApplicationUser user = new ApplicationUser();
-                        try {
-                            user.setLogin(textInput.readLine());
-                            user.setPassword(textInput.readLine());
-                        } catch (IOException ex) {
-                            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
-                        }
-                        EntityManagerFactory emf = Persistence.createEntityManagerFactory("SynchronizationAppPU");            
-                        EntityManager em = emf.createEntityManager();
-                        em.getTransaction().begin();
-                        List<ApplicationUser> users = (List<ApplicationUser>)em.createQuery("from ApplicationUser").getResultList();
-                        em.getTransaction().commit();
-                        em.close();
-                        emf.close();
-                        if (users.contains(user)) {
-                            System.out.println("Authorization successfull!");
-                            clientIsAuthorised = true;
-                            textOutput.println("continue");
-                        } else {                            
-                            System.out.println("Bad authorization...");
-                            clientIsAuthorised = false;
-                            textOutput.println("stop");
-                            commands.clear();
-                            break;
-                        }
-                        break;
-                    }
-                    case "sendDirectory" : {
-                        if (clientIsAuthorised) {
-                            try {
-                                clientDir = (Directory) objectInput.readObject();
-                            } catch (IOException ex) {
-                                Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
-                            } catch (ClassNotFoundException ex) {
-                                Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
-                            }                       
-                            serverDir.syncWith(clientDir, toClientReplace, toClientRemove, toServerReplace, toServerRemove);
-                            changes = toClientReplace.size() + toClientRemove.size() + toServerReplace.size() + toServerRemove.size();
-                            System.out.println("I have found " + changes + " changes");
-                            serverDir.deleteAll(toServerRemove);
-                            System.out.println("----toClientReplace----");
-                            for (FileProperties fi1: toClientReplace) {
-                                System.out.println(fi1.getPath());
-                            }
-                            System.out.println("----toClientRemove----");
-                            for (FileProperties fi1: toClientRemove) {
-                                System.out.println(fi1.getPath());
-                            }
-                            System.out.println("----toServerReplace----");
-                            for (FileProperties fi1: toServerReplace) {
-                                System.out.println(fi1.getPath());
-                            }
-                            System.out.println("----toServerRemove----");
-                            for (FileProperties fi1: toServerRemove) {
-                                System.out.println(fi1.getPath());
-                            }
-                            System.out.println("--------");
-                        }
-                        break;
-                    }
-                    case "getServerReplace" : {
-                        if (clientIsAuthorised) {
-                            try {
-                                objectOutput.writeObject(toServerReplace);
-                            } catch (IOException ex) {
-                                Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
-                            }
-                        }
-                        break;
-                    }
-                    case "getClientReplace" : {                        
-                        if (clientIsAuthorised) {
-                            try {
-                                objectOutput.writeObject(toClientReplace);
-                            } catch (IOException ex) {
-                                Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
-                            }
-                        }
-                        break;
-                    }
-                    case "getClientRemove" : {    
-                        if (clientIsAuthorised) {                    
-                            try {
-                                objectOutput.writeObject(toClientRemove);
-                            } catch (IOException ex) {
-                                Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
-                            }
-                        }
-                        break;
-                    }
-                    case "startFilesTransfer" : {                        
-                        if (clientIsAuthorised) {
-                            deinitObjectTransferring();
-                            initFileTransferring();
-                        }
-                        break;
-                    }
-                    case "startObjectsTransfer" : {
-                        if (clientIsAuthorised) {
-                            deinitCommandTransferring();
-                            initObjectTransferring();
-                        }
-                        break;
-                    }
-                    case "sendForServerReplace" : {
-                        if (clientIsAuthorised) {
-                            receiveFiles(dataInput,serverDir,toServerReplace);
-                        }
-                        break;
-                    }
-                    case "waitForClientReplace" : {
-                        if (clientIsAuthorised) {
-                            sendFiles(dataOutput,serverDir,toClientReplace);
-                        }
-                        break;
-                    }
-                }
-                if (!commands.isEmpty()) commands.remove(mark);
             }
+            // Класс засыпает до тех пор, пока клиент не получит необходимые для синхронизации данные.
+            // метод sync класса SyncService будит этот класс
+            suspend();              
+
+            try {
+                toClientReplace = serverService.getToClientReplace();
+                toClientRemove = serverService.getToClientRemove();
+                toServerReplace = serverService.getToServerReplace();
+                toServerRemove = serverService.getToServerRemove();
+            } catch (RemoteException ex) {
+                Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+            }
+
+            serverDir.deleteAll(toServerRemove);
+            
+            initFileTransferring();
+            sendFiles(dataOutput,serverDir,toClientReplace);
+            receiveFiles(dataInput,serverDir,toServerReplace);
             deinitFileTransferring();
+            
             serverDir.createState();
             serverDir.saveStateToFile(new File(config.getProperty(SERVER_STATE)));
             serverDir.setLastState();
-            System.out.println("Completed in " + (System.currentTimeMillis() - time) + "ms!");
+            System.out.println("Done.");
+            //System.out.println("Completed in " + (System.currentTimeMillis() - time) + "ms!");            
         }
     }
     
     @Override
-    protected void initCommandTransferring() {        
-        try {
-            server = new ServerSocket(Integer.valueOf(config.getProperty("port")));
-            commandSocket = server.accept();
-            out = commandSocket.getOutputStream();
-            in = commandSocket.getInputStream();            
-            textOutput = new PrintWriter(out,true);      
-            textInput = new BufferedReader(new InputStreamReader(in)); 
-        } catch (IOException ex) {
-            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
-        }
-    }
-
-    @Override
-    protected void deinitCommandTransferring() {        
-        try {
-            server.close();
-            commandSocket.close();
-            out.close();
-            in.close();
-            textOutput.close();
-            textInput.close();
-        } catch (IOException ex) {
-            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (NullPointerException ex) {
-            //ignore
-        }
-    }
-
-    @Override
-    protected void initObjectTransferring() {
-        try {
-            server = new ServerSocket(Integer.valueOf(config.getProperty("port"))+1);
-            objectSocket = server.accept();
-            out = objectSocket.getOutputStream();
-            in = objectSocket.getInputStream();
-            objectOutput = new ObjectOutputStream(out);
-            objectInput = new ObjectInputStream(in);
-        } catch (IOException ex) {                            
-            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
-        }
-    }
-
-    @Override
-    protected void deinitObjectTransferring() {
-        try {
-            server.close();
-            objectSocket.close();
-            out.close();
-            in.close();
-            objectOutput.close();
-            objectInput.close();
-        } catch (IOException ex) {
-            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (NullPointerException ex) {
-            //ignore
-        }
-    }
-
-    @Override
-    protected void initFileTransferring() {
+    public void initFileTransferring() {
         try {
             server = new ServerSocket(Integer.valueOf(config.getProperty("port"))+2);
             dataSocket = server.accept();
@@ -296,7 +132,7 @@ public class Server extends WebMember {
     }
 
     @Override
-    protected void deinitFileTransferring() {
+    public void deinitFileTransferring() {
         try {
             server.close();
             dataSocket.close();
@@ -309,5 +145,6 @@ public class Server extends WebMember {
         } catch (NullPointerException ex) {
             //ignore
         }
-    }    
+    }
+    
 }

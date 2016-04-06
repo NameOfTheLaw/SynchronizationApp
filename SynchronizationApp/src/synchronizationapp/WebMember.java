@@ -28,7 +28,7 @@ import java.util.logging.Logger;
  * Абстрактный класс, содержащий методы передачи файлов по сети
  * @author andrey
  */
-abstract class WebMember extends Thread{
+abstract class WebMember extends Thread {
     
     protected Config config;
     protected final String CLIENT_ROOT="root2";
@@ -36,16 +36,12 @@ abstract class WebMember extends Thread{
     protected final String SERVER_ROOT="root1";
     protected final String SERVER_STATE="lastState1";
     
-    protected Socket commandSocket, objectSocket, dataSocket;
+    protected Socket dataSocket;
     protected OutputStream out;
     protected InputStream in;
-    protected PrintWriter textOutput;
     protected DataOutputStream dataOutput;
     protected DataInputStream dataInput;
-    protected ObjectOutputStream objectOutput;
-    protected ObjectInputStream objectInput;
     protected ServerSocket server;
-    protected BufferedReader textInput;
         
     /**
      * Метод, читающий размер файла, а затем сам файл с входного потока is, 
@@ -82,7 +78,7 @@ abstract class WebMember extends Thread{
             } catch (SocketException ex) {            
                 System.out.print("file has been saved*");
             } catch (IOException ex) {            
-                Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                System.out.print("file has been saved**");
             }
             System.out.println();
         }
@@ -116,7 +112,7 @@ abstract class WebMember extends Thread{
             } catch (SocketException ex) {
                 System.out.print("sending has been finished*");
             } catch (IOException ex) {
-                Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                System.out.print("sending has been finished**");
             }
             System.out.println();
         }
@@ -169,32 +165,12 @@ abstract class WebMember extends Thread{
     }
     
     /**
-     * Метод инициализирует потоки для передачи команд
-     */
-    abstract protected void initCommandTransferring();
-    
-    /**
-     * Метод деинициализирует потоки для передачи команд
-     */
-    abstract protected void deinitCommandTransferring();
-        
-    /**
-     * Метод инициализирует потоки для передачи объектов
-     */
-    abstract protected void initObjectTransferring();
-    
-    /**
-     * Метод деинициализирует потоки для передачи объектов
-     */
-    abstract protected void deinitObjectTransferring();
-    
-    /**
      * Метод инициализирует потоки для передачи файлов
      */
-    abstract protected void initFileTransferring();
+    abstract public void initFileTransferring();
     
     /**
      * Метод деинициализирует потоки для передачи файлов
      */
-    abstract protected void deinitFileTransferring();
+    abstract public void deinitFileTransferring();
 }
