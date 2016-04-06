@@ -1,1 +1,1 @@
-java -jar SynchronizationApp/dist/SynchronizationApp.jar server
+java -jar -Duser.language=en -Duser.region=us SynchronizationApp/dist/SynchronizationApp.jar server
