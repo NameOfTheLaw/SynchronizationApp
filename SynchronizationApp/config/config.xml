@@ -2,12 +2,13 @@
 <!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">
 <properties>
 <comment>SynchronizationApp config</comment>
-<entry key="root2">E:\ITMO\2_kurs\battlefield\direc2</entry>
-<entry key="root1">E:\ITMO\2_kurs\battlefield\direc1</entry>
-<entry key="login">admin</entry>
 <entry key="port">6666</entry>
-<entry key="password">12345</entry>
-<entry key="host">127.0.0.1</entry>
 <entry key="lastState2">E:\ITMO\2_kurs\battlefield\laststate2</entry>
 <entry key="lastState1">E:\ITMO\2_kurs\battlefield\laststate1</entry>
+<entry key="ip">127.0.0.1</entry>
+<entry key="login">admin</entry>
+<entry key="root2">E:\ITMO\2_kurs\battlefield\direc2</entry>
+<entry key="root1">E:\ITMO\2_kurs\battlefield\direc1</entry>
+<entry key="password">12345</entry>
+<entry key="host">127.0.0.1</entry>
 </properties>

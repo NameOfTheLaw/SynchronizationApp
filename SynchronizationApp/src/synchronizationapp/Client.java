@@ -27,6 +27,7 @@ import java.util.Date;
 import java.util.TreeSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import synchronizationapp.ui.ClientJFrame;
 
 /**
  * Класс-поток клиента. При запуске отправляет серверу список действий и начинает их последовательно выполнять.
@@ -35,13 +36,15 @@ import java.util.logging.Logger;
 public class Client extends WebMember{
     
     private Directory clientDir;
+    private ClientJFrame frame;
 
     /**
      * Метод-конструктор клиента
      * @param config конфиг
      */
-    public Client(Config config) {
-        this.config = config;            
+    public Client(Config config, ClientJFrame frame) {
+        this.config = config;   
+        this.frame = frame;
         clientDir = new Directory(config.getProperty(CLIENT_ROOT));
         clientDir.createState();
         if (!clientDir.loadLastState(new File(config.getProperty(CLIENT_STATE)))) {
@@ -67,46 +70,60 @@ public class Client extends WebMember{
         String objectName = "rmi://" + config.getProperty("host") + "/mySyncService";    
         
         try {
-            serverService = (ISyncService) Naming.lookup(objectName);
+            //serverService = (ISyncService) Naming.lookup(objectName);
+            Registry registry = LocateRegistry.getRegistry(config.getProperty("host"), Integer.valueOf(config.getProperty("port")));
+            serverService = (ISyncService) registry.lookup("mySyncService");
+            connectionIsEstablished = true;
         } catch (NotBoundException ex) {
             Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (MalformedURLException ex) {
-            Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
         } catch (RemoteException ex) {
             Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
         }
-        
-        try {
-            authorizationPassed = serverService.authorization(user);
-        } catch (RemoteException ex) {
-            Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
-        }
-                
-        if (authorizationPassed) {   
-            System.out.println("Start processing...");
-
+        frame.setProgress(5);
+        if (connectionIsEstablished) {
             try {
-                serverService.sync(clientDir);
-                toClientReplace = serverService.getToClientReplace();
-                toClientRemove = serverService.getToClientRemove();
-                toServerReplace = serverService.getToServerReplace();
+                authorizationPassed = serverService.authorization(user);
             } catch (RemoteException ex) {
                 Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
             }
-            clientDir.deleteAll(toClientRemove);
 
-            System.out.println("Start transferring files...");  
-            
-            initFileTransferring();        
-            sendFiles(dataOutput,clientDir,toServerReplace);
-            receiveFiles(dataInput,clientDir,toClientReplace);        
-            deinitFileTransferring();
+            if (authorizationPassed) {   
+                System.out.println("Start processing...");
+                frame.setProgress(10);
 
-            clientDir.createState();
-            clientDir.saveStateToFile(new File(config.getProperty(CLIENT_STATE)));
-            System.out.println("Completed!");            
+                try {
+                    serverService.sync(clientDir);
+                    frame.setProgress(30);
+                    toClientReplace = serverService.getToClientReplace();
+                    toClientRemove = serverService.getToClientRemove();
+                    toServerReplace = serverService.getToServerReplace();
+                } catch (RemoteException ex) {
+                    Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+                }
+                clientDir.deleteAll(toClientRemove);
+                frame.setProgress(40);
+
+                System.out.println("Start transferring files...");  
+
+                initFileTransferring();
+                frame.setProgress(50);
+                sendFiles(dataOutput,clientDir,toServerReplace);
+                frame.setProgress(70);
+                receiveFiles(dataInput,clientDir,toClientReplace);    
+                frame.setProgress(90);    
+                deinitFileTransferring();
+
+                clientDir.createState();
+                clientDir.saveStateToFile(new File(config.getProperty(CLIENT_STATE)));                
+                frame.setProgress(100);                
+                frame.setComplited();
+                System.out.println("Completed!");            
+            } else {
+                System.out.println("Please check your login and password. Bye");               
+            }
         } else {
-            System.out.println("Please check your login and password. Bye");               
+            System.out.println("Connection to server was failed");
+            frame.connectionWasFailed();
         }
     }
     

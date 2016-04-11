@@ -5,6 +5,9 @@
  */
 package synchronizationapp;
 
+import javax.swing.WindowConstants;
+import synchronizationapp.ui.ClientJFrame;
+
 /**
  * Класс-поток синхронизации. Запускает либо клиентскую часть приложения, 
  * либо серверную (согласно первому аргументу командной строки)
@@ -29,10 +32,21 @@ public class SyncThread extends Thread{
                 Server server = new Server(config);                        
                 System.out.println("Starting server...");
                 server.start();
-            } else if (config.getStatus().equals("client")) {
-                Client client = new Client(config);                        
-                System.out.println("Starting client...");
-                client.start();
+            } else if (config.getStatus().equals("client")) {                        
+                System.out.println("Starting client...");       
+                /*
+                java.awt.EventQueue.invokeLater(new Runnable() {
+                    @Override
+                    public void run() {                
+                        ClientJFrame clientFrame = new ClientJFrame(client);
+                        clientFrame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+                        clientFrame.setVisible(true);
+                    }
+                });
+                */
+                ClientJFrame clientFrame = new ClientJFrame(config);
+                clientFrame.setVisible(true);
+                //client.start();
             }            
         }
     }    

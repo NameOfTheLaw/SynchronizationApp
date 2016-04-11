@@ -43,7 +43,7 @@ public class Server extends WebMember {
      * @param config конфиг
      */
     public Server(Config config) {
-        this.config = config;        
+        this.config = config;
         serverDir = new Directory(config.getProperty(SERVER_ROOT));
         serverDir.createState();
         if (!serverDir.loadLastState(new File(config.getProperty(SERVER_STATE)))) {
@@ -62,7 +62,7 @@ public class Server extends WebMember {
         String serviceName = "mySyncService";
         Registry reg = null;
         try {
-            reg = LocateRegistry.createRegistry(1099);
+            reg = LocateRegistry.createRegistry(Integer.valueOf(config.getProperty("port")));
         } catch (RemoteException ex) {
             Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -74,7 +74,7 @@ public class Server extends WebMember {
                     toServerReplace = null,
                     toServerRemove = null;
             boolean timeisstart = false,
-                clientIsAuthorised = false;            
+                clientIsAuthorised = false;
             ISyncService serverService = null;
 
             System.out.println("Waiting for client...");
@@ -89,8 +89,8 @@ public class Server extends WebMember {
             }
             // Класс засыпает до тех пор, пока клиент не получит необходимые для синхронизации данные.
             // метод sync класса SyncService будит этот класс
-            suspend();              
-
+            suspend();
+            
             try {
                 toClientReplace = serverService.getToClientReplace();
                 toClientRemove = serverService.getToClientRemove();
@@ -127,7 +127,7 @@ public class Server extends WebMember {
         } catch (IOException ex) {
             Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
         } catch (NullPointerException ex) {
-            //ignore
+            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 

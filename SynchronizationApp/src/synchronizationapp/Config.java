@@ -14,7 +14,7 @@ import java.util.Properties;
  * Класс, реализующий подгрузку конфига и его запись
  * @author andrey
  */
-class Config {
+public class Config {
     private final String file;
     private Properties prop;
     private String status;
